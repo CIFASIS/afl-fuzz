@@ -128,7 +128,30 @@ The afl-gotcpu utility can help you understand if you still have idle CPU
 capacity on your system. (It won't tell you about memory bandwidth, cache
 misses, or similar factors, but they are less likely to be a concern.)
 
-7) Keep memory use and timeouts in check
+7) Pin your fuzzers to a specific core with -Z
+----------------------------------------------
+
+The fuzzer is generally quite CPU heavy, executing thousands of processes per
+second in some cases. And as mentioned in the previous tip, you may often run
+multiple fuzzer instances on a single machine as well, saturating your CPU
+as much as possible.
+
+To increase performance and keep your executions/second 'stable', it's often
+very useful to pin each fuzzer to a specific CPU core, using the '-Z <num>'
+option. This will prevent your OS from rescheduling the fuzzer process on any
+other cores. This will normally increase performance (and remove exec/s jitter)
+as you won't have to pay the expensive cost of rescheduling AFL on another
+core, one which might be far away. Such rescheduling often causes cache
+invalidation and a larger amount of context switches.
+
+On NUMA machines that are multi-socket, this can especially have an impact,
+as rescheduling to a core on a different socket can have a huge impact on
+performance and hardware utilization.
+
+In general, if you execute N fuzzers on a machine, simply pass the arguments
+'-Z 0', '-Z 1', ... '-Z <N>' to each instance of your fuzzer, respectively.
+
+8) Keep memory use and timeouts in check
 ----------------------------------------
 
 If you have increased the -m or -t limits more than truly necessary, consider
@@ -144,7 +167,7 @@ a fair amount of time allocating and initializing megabytes of memory when
 presented with pathological inputs. Low -m values can make them give up sooner
 and not waste CPU time.
 
-8) Check OS configuration
+9) Check OS configuration
 -------------------------
 
 There are several OS-level factors that may affect fuzzing speed:
@@ -178,7 +201,7 @@ There are several OS-level factors that may affect fuzzing speed:
     SCHED_RR - can usually speed things up, too, but needs to be done with
     care.
 
-9) If all other options fail, use -d
+10) If all other options fail, use -d
 ------------------------------------
 
 For programs that are genuinely slow, in cases where you really can't escape
