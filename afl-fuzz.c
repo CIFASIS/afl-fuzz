@@ -55,6 +55,10 @@
 #include <sys/ioctl.h>
 #include <sys/file.h>
 
+#if defined(__linux__)
+#  include <sched.h>
+#endif
+
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
 #endif /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
@@ -111,6 +115,8 @@ static s32 out_fd,                    /* Persistent fd for out_file       */
 static s32 forksrv_pid,               /* PID of the fork server           */
            child_pid = -1,            /* PID of the fuzzed program        */
            out_dir_fd = -1;           /* FD of the lock file              */
+
+static s32 thread_affinity = -1;      /* CPU affinity for this fuzzer     */
 
 static u8* trace_bits;                /* SHM with instrumentation bitmap  */
 
@@ -6753,7 +6759,8 @@ static void usage(u8* argv0) {
 
        "  -T text       - text banner to show on the screen\n"
        "  -M / -S id    - distributed mode (see parallel_fuzzing.txt)\n"
-       "  -C            - crash exploration mode (the peruvian rabbit thing)\n\n"
+       "  -C            - crash exploration mode (the peruvian rabbit thing)\n"
+       "  -Z num        - pin to a specific core for speed (linux only)\n\n"
 
        "For additional tips, please consult %s/README.\n\n",
 
@@ -7353,6 +7360,27 @@ static void save_cmdline(u32 argc, char** argv) {
 
 }
 
+static void set_thread_affinity(s32 aff) {
+
+#if defined(__linux__)
+  cpu_set_t cpus;
+  long num_threads = sysconf(_SC_NPROCESSORS_ONLN);
+
+  if (aff > num_threads)
+    FATAL("Invalid -Z specifier (%u, but only %ld cores)",
+          thread_affinity, num_threads);
+
+  CPU_ZERO(&cpus);
+  CPU_SET(aff, &cpus);
+  if (0 != sched_setaffinity(0, sizeof(cpus), &cpus))
+    PFATAL("sched_setaffinity(2) failed");
+
+#else
+  (void)aff; /* Suppress warnings */
+  FATAL("-Z is not supported on your operating system yet!");
+#endif
+}
+
 
 /* Main entry point */
 
@@ -7370,8 +7398,7 @@ int main(int argc, char** argv) {
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q")) > 0)
-
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QZ:")) > 0)
     switch (opt) {
 
       case 'i':
@@ -7502,7 +7529,7 @@ int main(int argc, char** argv) {
 
         if (dumb_mode) FATAL("Multiple -n options not supported");
         if (getenv("AFL_DUMB_FORKSRV")) dumb_mode = 2; else dumb_mode = 1;
-
+        if (getenv("AFL_DUMB_FORKSRV")) dumb_mode = 2 ; else dumb_mode = 1;
         break;
 
       case 'T':
@@ -7519,6 +7546,23 @@ int main(int argc, char** argv) {
         if (!mem_limit_given) mem_limit = MEM_LIMIT_QEMU;
 
         break;
+
+      case 'Z': {
+
+        if (thread_affinity != -1) FATAL("Multiple -Z options not supported");
+
+        char *p = optarg;
+        while (*p) {
+          if (!isdigit(*p)) FATAL("-Z argument must be a number");
+          p++;
+        }
+
+        thread_affinity = atoi(optarg);
+        if (thread_affinity < 0)
+          FATAL("Invalid -Z specifier (must be above zero)");
+
+        break;
+      }
 
       default:
 
@@ -7547,6 +7591,10 @@ int main(int argc, char** argv) {
   if (getenv("AFL_NO_CPU_RED"))    no_cpu_meter_red = 1;
   if (getenv("AFL_NO_VAR_CHECK"))  no_var_check     = 1;
   if (getenv("AFL_SHUFFLE_QUEUE")) shuffle_queue    = 1;
+
+  if (thread_affinity != -1)
+    set_thread_affinity(thread_affinity);
+
 
   if (dumb_mode == 2 && no_forkserver)
     FATAL("AFL_DUMB_FORKSRV and AFL_NO_FORKSRV are mutually exclusive");

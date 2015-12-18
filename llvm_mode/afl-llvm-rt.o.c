@@ -152,7 +152,6 @@ static void __afl_start_forkserver(void) {
     /* Relay wait status to pipe, then loop back. */
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
-
   }
 
 }
