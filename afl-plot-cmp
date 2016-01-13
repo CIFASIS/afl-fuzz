@@ -116,7 +116,7 @@ set terminal png truecolor enhanced size 1000,200 butt
 set output '$3/crashes.png'
 
 plot '$1/plot_data' using ((\$1-$START1)/3600):8 with lines title '$1' linecolor rgb '#c00080' linewidth 3, \\
-     '$2/plot_data' using ((\$1-$START2)/3600):8 with lines title '$1' linecolor rgb '#c08000' linewidth 3
+     '$2/plot_data' using ((\$1-$START2)/3600):8 with lines title '$2' linecolor rgb '#c08000' linewidth 3
 
 _EOF_
 
