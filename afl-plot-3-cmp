@@ -104,14 +104,14 @@ set autoscale xfixmin
 set autoscale xfixmax
 
 plot '$1/plot_data' using ((\$1-$START1)/3600):4 with lines title '$1' linecolor rgb '#000000' linewidth 3, \\
-     '$2/plot_data' using ((\$1-$START2)/3600):4 with lines title '$2' linecolor rgb '#008000' linewidth 3
+     '$2/plot_data' using ((\$1-$START2)/3600):4 with lines title '$2' linecolor rgb '#008000' linewidth 3, \\
      '$3/plot_data' using ((\$1-$START3)/3600):4 with lines title '$3' linecolor rgb '#800000' linewidth 3
 
 set terminal png truecolor enhanced size 1000,200 butt
 set output '$4/crashes.png'
 
 plot '$1/plot_data' using ((\$1-$START1)/3600):8 with lines title '$1' linecolor rgb '#000000' linewidth 3, \\
-     '$2/plot_data' using ((\$1-$START2)/3600):8 with lines title '$2' linecolor rgb '#008000' linewidth 3
+     '$2/plot_data' using ((\$1-$START2)/3600):8 with lines title '$2' linecolor rgb '#008000' linewidth 3, \\
      '$3/plot_data' using ((\$1-$START3)/3600):8 with lines title '$3' linecolor rgb '#800000' linewidth 3
 
 _EOF_
