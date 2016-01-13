@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+# american fuzzy lop - Advanced Persistent Graphing
+# -------------------------------------------------
+#
+# Written and maintained by Michal Zalewski <lcamtuf@google.com>
+# Based on a design & prototype by Michael Rash.
+#
+# Copyright 2014, 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+
+echo "progress plotting utility for afl-fuzz by <lcamtuf@google.com>"
+echo
+
+if [ ! "$#" = "4" ]; then
+
+  cat 1>&2 <<_EOF_
+This program generates gnuplot images from afl-fuzz output data. Usage:
+
+$0 afl_state_dir graph_output_dir
+
+The afl_state_dir parameter should point to an existing state directory for any
+active or stopped instance of afl-fuzz; while graph_output_dir should point to
+an empty directory where this tool can write the resulting plots to.
+
+The program will put index.html and three PNG images in the output directory;
+you should be able to view it with any web browser of your choice.
+
+_EOF_
+
+  exit 1
+
+fi
+
+echo "$1" | grep -qE '^(/var)?/tmp/'
+T1="$?"
+
+echo "$2" | grep -qE '^(/var)?/tmp/'
+T2="$?"
+
+if [ "$T1" = "0" -o "$T2" = "0" ]; then
+
+  echo "[-] Error: this script shouldn't be used with shared /tmp directories." 1>&2
+  exit 1
+
+fi
+
+if [ ! -f "$1/plot_data" ]; then
+
+  echo "[-] Error: input directory is not valid (missing 'plot_data')." 1>&2
+  exit 1
+
+fi
+
+START1="$(cat $1/fuzzer_stats | grep start_time | cut -f 2 -d ':')"
+START2="$(cat $2/fuzzer_stats | grep start_time | cut -f 2 -d ':')"
+START3="$(cat $3/fuzzer_stats | grep start_time | cut -f 2 -d ':')"
+#BANNER="`cat "$1/fuzzer_stats" | grep '^afl_banner ' | cut -d: -f2- | cut -b2-`"
+
+#test "$BANNER" = "" && BANNER="(none)"
+
+GNUPLOT=`which gnuplot 2>/dev/null`
+
+if [ "$GNUPLOT" = "" ]; then
+
+  echo "[-] Error: can't find 'gnuplot' in your \$PATH." 1>&2
+  exit 1
+
+fi
+
+mkdir "$4" 2>/dev/null
+
+if [ ! -d "$4" ]; then
+
+  echo "[-] Error: unable to create the output directory - pick another location." 1>&2
+  exit 1
+
+fi
+
+echo "[*] Generating plots..."
+
+(
+
+cat <<_EOF_
+set terminal png truecolor enhanced size 1000,300 butt
+set output '$4/paths.png'
+
+unset mxtics
+unset mytics
+
+set grid xtics linetype 0 linecolor rgb '#e0e0e0'
+set grid ytics linetype 0 linecolor rgb '#e0e0e0'
+set border linecolor rgb '#50c0f0'
+set tics textcolor rgb '#000000'
+set key outside
+
+set autoscale xfixmin
+set autoscale xfixmax
+
+plot '$1/plot_data' using ((\$1-$START1)/3600):4 with lines title '$1' linecolor rgb '#000000' linewidth 3, \\
+     '$2/plot_data' using ((\$1-$START2)/3600):4 with lines title '$2' linecolor rgb '#008000' linewidth 3
+     '$3/plot_data' using ((\$1-$START3)/3600):4 with lines title '$3' linecolor rgb '#800000' linewidth 3
+
+set terminal png truecolor enhanced size 1000,200 butt
+set output '$4/crashes.png'
+
+plot '$1/plot_data' using ((\$1-$START1)/3600):8 with lines title '$1' linecolor rgb '#000000' linewidth 3, \\
+     '$2/plot_data' using ((\$1-$START2)/3600):8 with lines title '$2' linecolor rgb '#008000' linewidth 3
+     '$3/plot_data' using ((\$1-$START3)/3600):8 with lines title '$3' linecolor rgb '#800000' linewidth 3
+
+_EOF_
+
+) | gnuplot
+
+if [ ! -s "$4/crashes.png" ]; then
+
+  echo "[-] Error: something went wrong! Perhaps you have an ancient version of gnuplot?" 1>&2
+  exit 1
+
+fi
+
+echo "[+] All done - enjoy your charts!"
+
+exit 0
