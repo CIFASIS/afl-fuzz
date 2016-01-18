@@ -63,6 +63,7 @@ static s32 shm_id;                    /* ID of the SHM region              */
 
 static u8  quiet_mode,                /* Hide non-essential messages?      */
            edges_only,                /* Ignore hit counts?                */
+           vector_mode,                /* Generate output in vector mode   */
            cmin_mode;                 /* Generate output in afl-cmin mode? */
 
 static volatile u8
@@ -176,10 +177,18 @@ static u32 write_results(void) {
 
   for (i = 0; i < MAP_SIZE; i++) {
 
-    if (!trace_bits[i]) continue;
+    if (!trace_bits[i] && !vector_mode) continue;
     ret++;
 
-    if (cmin_mode) {
+    if (vector_mode) {
+
+      if (child_timed_out) break;
+      if (!caa && child_crashed != cco) break;
+
+      fprintf(f, "%u ", trace_bits[i]);
+
+    }
+    else if (cmin_mode) {
 
       if (child_timed_out) break;
       if (!caa && child_crashed != cco) break;
@@ -189,7 +198,10 @@ static u32 write_results(void) {
     } else fprintf(f, "%06u:%u\n", i, trace_bits[i]);
 
   }
-  
+
+  if (vector_mode)
+    fprintf(f, "\n");
+
   fclose(f);
 
   return ret;
@@ -575,7 +587,7 @@ int main(int argc, char** argv) {
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  while ((opt = getopt(argc,argv,"+o:m:t:A:eqZQ")) > 0)
+  while ((opt = getopt(argc,argv,"+o:m:t:A:eqZQv")) > 0)
 
     switch (opt) {
 
@@ -656,6 +668,10 @@ int main(int argc, char** argv) {
 
         cmin_mode  = 1;
         quiet_mode = 1;
+        break;
+      case 'v':
+
+        vector_mode  = 1;
         break;
 
       case 'A':
